@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>节奏榜编辑器</title>
+<style>
+:root {
+  --bg: #0d0d1a;
+  --surface: #16162e;
+  --surface2: #1e1e3a;
+  --border: #2a2a50;
+  --text: #e8e8f0;
+  --text2: #8888aa;
+  --accent: #6c6cff;
+  --danger: #ff4466;
+  font-family: "Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  font-size: 13px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+button { font: inherit; border: 0; cursor: pointer; background: none; color: inherit; }
+input { font: inherit; outline: none; }
+
+.app { display: flex; height: 100vh; }
+
+/* ========== Top Bar ========== */
+.topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; background: var(--surface);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.topbar h1 { font-size: 16px; font-weight: 800; margin-right: auto; }
+.topbar .sub { font-size: 11px; color: var(--text2); }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 30px; padding: 0 14px; border-radius: 6px;
+  font-size: 12px; font-weight: 700; gap: 4px;
+  background: var(--surface2); color: var(--text);
+  border: 1px solid var(--border); transition: all 0.15s;
+}
+.btn:hover { background: #2a2a50; border-color: #4a4a7a; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.15); }
+.btn-sm { height: 24px; padding: 0 8px; font-size: 11px; }
+
+/* ========== Left Side ========== */
+.left-panel {
+  flex: 0 0 75%; display: flex; flex-direction: column; min-width: 0;
+}
+.tier-scroll {
+  flex: 1; overflow-y: auto; padding: 12px 16px 16px;
+}
+.tier-scroll::-webkit-scrollbar { width: 6px; }
+.tier-scroll::-webkit-scrollbar-track { background: transparent; }
+.tier-scroll::-webkit-scrollbar-thumb { background: #3a3a5a; border-radius: 3px; }
+
+.tier-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  margin-bottom: 10px; padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  transition: border-color 0.2s;
+}
+.tier-row.drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,108,255,0.3); }
+
+.tier-label-area {
+  display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0; min-width: 90px; padding-top: 4px;
+}
+.tier-color-bar {
+  width: 8px; height: 60px; border-radius: 4px; flex-shrink: 0; cursor: pointer;
+}
+.tier-name {
+  font-weight: 800; font-size: 36px; cursor: pointer; white-space: nowrap;
+  line-height: 1; transition: color 0.15s;
+}
+.tier-name:hover { color: #fff; }
+.tier-count {
+  font-size: 11px; color: var(--text2); white-space: nowrap; align-self: flex-end;
+  margin-bottom: 4px;
+}
+
+.tier-body {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start;
+  flex: 1; padding: 2px 0; min-height: 60px;
+}
+.tier-body.drag-over { background: rgba(108,108,255,0.06); border-radius: 6px; }
+.tier-body.empty::after {
+  content: "拖入角色到此处"; display: block;
+  font-size: 12px; color: var(--text2); padding: 20px 0 0 0;
+  pointer-events: none;
+}
+
+.tier-actions {
+  display: flex; flex-direction: column; gap: 4px;
+  flex-shrink: 0; padding-top: 4px;
+}
+.tier-action-btn {
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border-radius: 5px; font-size: 14px; color: var(--text2); opacity: 0.4;
+  transition: all 0.15s; cursor: pointer;
+}
+.tier-action-btn:hover { opacity: 1; background: rgba(255,255,255,0.08); color: #fff; }
+.tier-action-btn.del:hover { color: var(--danger); }
+
+/* ========== Right Side ========== */
+.right-panel {
+  flex: 0 0 25%; display: flex; flex-direction: column;
+  border-left: 1px solid var(--border); background: var(--surface); min-width: 0;
+}
+.pool-scroll {
+  flex: 1; overflow-y: auto; padding: 12px 16px 16px;
+}
+.pool-scroll::-webkit-scrollbar { width: 6px; }
+.pool-scroll::-webkit-scrollbar-track { background: transparent; }
+.pool-scroll::-webkit-scrollbar-thumb { background: #3a3a5a; border-radius: 3px; }
+
+.pool-title { font-size: 15px; font-weight: 700; margin-bottom: 10px; }
+
+.faction-filters {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;
+}
+.faction-btn {
+  padding: 5px 12px; border-radius: 14px; border: 1px solid var(--border);
+  background: var(--surface2); color: var(--text2);
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  transition: all 0.15s; white-space: nowrap;
+}
+.faction-btn:hover { background: #2a2a4e; color: #fff; }
+.faction-btn.active { background: rgba(108,108,255,0.2); color: #fff; border-color: var(--accent); }
+
+.pool-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
+  align-content: flex-start; min-height: 60px;
+}
+
+/* ========== Character Images ========== */
+.char-img {
+  border-radius: 8px; cursor: grab; border: 2px solid transparent;
+  transition: transform 0.15s; background: #1a1a30; display: block;
+  will-change: transform;
+}
+.char-img:hover { transform: scale(1.06); z-index: 2; }
+.char-img:active { cursor: grabbing; }
+.char-img.dragging { opacity: 0.3; }
+.char-img[data-faction="元素"] { border-color: #FF6B6B; }
+.char-img[data-faction="旷野"] { border-color: #69DB7C; }
+.char-img[data-faction="奥术"] { border-color: #DA77F2; }
+.char-img[data-faction="圣堂"] { border-color: #FFD43B; }
+.char-img[data-faction="彼岸"] { border-color: #748FFC; }
+.char-img[data-faction="幻境"] { border-color: #F783AC; }
+.char-img.in-tier { height: 130px; width: auto; cursor: grab; }
+.char-img.in-pool { width: 100%; height: auto; aspect-ratio: 3/4; cursor: pointer; border-radius: 6px; object-fit: cover; }
+.char-img.in-pool.hidden { display: none; }
+.char-img.in-pool:hover { border-color: var(--accent); }
+
+/* ========== Context Menu ========== */
+.ctx-menu {
+  position: fixed; z-index: 99999;
+  background: #1c1c3a; border: 1px solid #3a3a5a;
+  border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+  padding: 4px 0; min-width: 120px; display: none;
+}
+.ctx-menu.show { display: block; }
+.ctx-item {
+  padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer;
+  color: var(--text);
+}
+.ctx-item:hover { background: rgba(108,108,255,0.2); }
+.ctx-item.danger { color: var(--danger); }
+.ctx-item.danger:hover { background: rgba(255,68,102,0.15); }
+
+/* ========== Status ========== */
+.statusbar {
+  height: 26px; display: flex; align-items: center;
+  padding: 0 14px; font-size: 10px; color: var(--text2);
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.statusbar.success { color: #69DB7C; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="left-panel">
+    <div class="topbar">
+      <img id="logoImg" src="logo.png" style="height:28px;width:auto;display:none" onerror="this.style.display='none'" onload="this.style.display='block'">
+      <h1>节奏榜编辑器</h1>
+      <span class="sub" id="charCount"></span>
+      <button class="btn btn-sm" id="saveBtn">保存</button>
+      <button class="btn btn-sm" id="resetBtn">重置</button>
+      <button class="btn btn-sm primary" id="addTierBtn">+ 添加阶级</button>
+    </div>
+    <div class="tier-scroll" id="tierScroll">
+      <div id="tierContainer"></div>
+    </div>
+  </div>
+
+  <div class="right-panel">
+    <div class="topbar">
+      <div class="pool-title">角色池</div>
+      <span style="font-size:11px;color:var(--text2);margin-left:auto;">作者：番薯不甜</span>
+    </div>
+    <div class="pool-scroll">
+      <div class="faction-filters" id="filters"></div>
+      <div class="pool-grid" id="poolGrid"></div>
+    </div>
+  </div>
+</div>
+
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-item" data-action="baowu">🔮 宝具</div>
+  <div class="ctx-item danger" data-action="remove">✕ 移除</div>
+</div>
+
+<div class="statusbar" id="statusbar">拖拽角色从右到左，在阶级间拖拽可移动，右键移除</div>
+
+<script>
+const FACTIONS = ["元素","旷野","奥术","圣堂","彼岸","幻境"];
+const FACTION_COLORS = {
+  "元素":"#FF6B6B","旷野":"#69DB7C","奥术":"#DA77F2",
+  "圣堂":"#FFD43B","彼岸":"#748FFC","幻境":"#F783AC"
+};
+// Each character can belong to multiple factions (encoded in filename digits: 1=元素,2=旷野,3=奥术,4=圣堂,5=彼岸,6=幻境)
+const CHAR_FACTIONS = {
+  "七纱舞娘":["元素","彼岸"],"万蛇之母":["彼岸","幻境"],"乱世魔王":["旷野","奥术"],
+  "仲夏夜之梦":["元素","旷野"],"光耀元素":["元素","圣堂"],"六臂蛇魔":["旷野","奥术"],
+  "冥府之王":["奥术","彼岸"],"冥界判官":["元素","彼岸"],"凯旋皇女":["圣堂","幻境"],
+  "北境女王":["元素","奥术"],"半神巫妖":["元素","彼岸"],"双生鸦灵":["旷野","幻境"],
+  "古树守卫":["旷野","奥术"],"史莱姆王":["彼岸","幻境"],"哥布林鼓手":["旷野","圣堂"],
+  "噬血剑魔":["旷野","幻境"],"四圣•朱雀":["元素","幻境"],"四圣•白虎":["旷野","彼岸"],
+  "四圣•青龙":["奥术","彼岸"],"四季鹿灵":["旷野","奥术"],"圣剑主教":["圣堂","幻境"],
+  "地狱三头犬":["元素","幻境"],"堕落女武神":["圣堂","彼岸"],"复仇女神":["奥术","幻境"],
+  "大力神":["旷野","奥术"],"大天使":["圣堂","彼岸"],"太极宗师":["旷野","幻境"],
+  "太阳神":["圣堂","彼岸"],"奥法领主":["奥术","幻境"],"女武神":["圣堂","彼岸"],
+  "妖精仙后":["元素","旷野"],"尘世巨蟒":["圣堂","幻境"],"屠龙勇士":["元素","旷野"],
+  "巫女":["旷野","奥术"],"幽冥公主":["元素","奥术"],"恶欲魔王":["旷野","彼岸"],
+  "恶魔支配者":["彼岸","幻境"],"战神":["奥术","幻境"],"护戒圣女":["旷野","彼岸"],
+  "捷足之神":["元素","幻境"],"断罪之翼":["奥术","幻境"],"无双剑豪":["圣堂","彼岸"],
+  "智慧女神":["旷野","圣堂"],"智慧巨人":["奥术","圣堂"],"暗影元素":["元素","幻境"],
+  "月亮女神":["奥术","幻境"],"死亡女神":["圣堂","彼岸"],"死亡骑士":["元素","彼岸"],
+  "永夜女王":["旷野","幻境"],"永恒之主":["圣堂","幻境"],"海神":["元素","幻境"],
+  "湖上骑士":["元素","圣堂"],"湖中仙女":["元素","圣堂"],"炎魔":["元素","奥术"],
+  "烈焰魔女":["元素","圣堂"],"爱神":["元素","旷野"],"狂猎之主":["奥术","彼岸"],
+  "猎魔人":["奥术","幻境"],"盗火之神":["旷野","奥术"],"示巴女王":["旷野","奥术"],
+  "祈愿灯神":["奥术","圣堂"],"繁星魔女":["元素","幻境"],"绝代妖狐":["旷野","圣堂"],
+  "绯刃剑魂":["旷野","彼岸"],"腐败花蕾":["彼岸","幻境"],"英灵战士":["圣堂","幻境"],
+  "英雄导师":["旷野","圣堂"],"英魂统领":["旷野","彼岸"],"蛮力神牛":["旷野","彼岸"],
+  "诡计之神":["旷野","彼岸"],"远古魔像":["元素","圣堂"],"野兽之王":["奥术","幻境"],
+  "铁胃暴君":["旷野","彼岸"],"铁腕执行官":["奥术","幻境"],"铁血统帅":["奥术","幻境"],
+  "锻火龙姫":["元素","旷野"],"雷神":["元素","圣堂"],"霜星射手":["元素","幻境"],
+  "青铜神姬":["旷野","奥术"],"魅夜之狩":["元素","奥术"],"鹰之勇者":["奥术","圣堂"],
+  "黑猫女神":["奥术","彼岸"],
+};
+// Maps character name to exact filename in 阵容/ folder
+const CHAR_FILES = {
+  "七纱舞娘":"15七纱舞娘.png","万蛇之母":"65万蛇之母.png","乱世魔王":"23乱世魔王.png",
+  "仲夏夜之梦":"12仲夏夜之梦.png","光耀元素":"41光耀元素.png","六臂蛇魔":"32六臂蛇魔.png",
+  "冥府之王":"35冥府之王.png","冥界判官":"51冥界判官.png","凯旋皇女":"46凯旋皇女.png",
+  "北境女王":"13北境女王.png","半神巫妖":"51半神巫妖.png","双生鸦灵":"26双生鸦灵.png",
+  "古树守卫":"23古树守卫.png","史莱姆王":"56史莱姆王.png","哥布林鼓手":"42哥布林鼓手.png",
+  "噬血剑魔":"62噬血剑魔.png","四圣•朱雀":"16四圣•朱雀.png","四圣•白虎":"25四圣•白虎.png",
+  "四圣•青龙":"53四圣•青龙.png","四季鹿灵":"23四季鹿灵.png","圣剑主教":"46圣剑主教.png",
+  "地狱三头犬":"61地狱三头犬.png","堕落女武神":"54堕落女武神.png","复仇女神":"36复仇女神.png",
+  "大力神":"23大力神.png","大天使":"45大天使.png","太极宗师":"26太极宗师.png",
+  "太阳神":"54太阳神.png","奥法领主":"63奥法领主.png","女武神":"45女武神.png",
+  "妖精仙后":"21妖精仙后.png","尘世巨蟒":"46尘世巨蟒.png","屠龙勇士":"12屠龙勇士.png",
+  "巫女":"32巫女.png","幽冥公主":"13幽冥公主.png","恶欲魔王":"52恶欲魔王.png",
+  "恶魔支配者":"56恶魔支配者.png","战神":"63战神.png","护戒圣女":"52护戒圣女.png",
+  "捷足之神":"61捷足之神.png","断罪之翼":"36断罪之翼.png","无双剑豪":"45无双剑豪.png",
+  "智慧女神":"42智慧女神.png","智慧巨人":"43智慧巨人.png","暗影元素":"16暗影元素.png",
+  "月亮女神":"36月亮女神.png","死亡女神":"45死亡女神.png","死亡骑士":"51死亡骑士.png",
+  "永夜女王":"62永夜女王.png","永恒之主":"46永恒之主.png","海神":"16海神.png",
+  "湖上骑士":"41湖上骑士.png","湖中仙女":"14湖中仙女.png","炎魔":"31炎魔.png",
+  "烈焰魔女":"14烈焰魔女.png","爱神":"21爱神.png","狂猎之主":"53狂猎之主.png",
+  "猎魔人":"36猎魔人.png","盗火之神":"23盗火之神.png","示巴女王":"23示巴女王.png",
+  "祈愿灯神":"34祈愿灯神.png","繁星魔女":"16繁星魔女.png","绝代妖狐":"24绝代妖狐.png",
+  "绯刃剑魂":"25绯刃剑魂.png","腐败花蕾":"65腐败花蕾.png","英灵战士":"46英灵战士.png",
+  "英雄导师":"42英雄导师.png","英魂统领":"52英魂统领.png","蛮力神牛":"25蛮力神牛.png",
+  "诡计之神":"52诡计之神.png","远古魔像":"41远古魔像.png","野兽之王":"36野兽之王.png",
+  "铁胃暴君":"25铁胃暴君.png","铁腕执行官":"36铁腕执行官.png","铁血统帅":"36铁血统帅.png",
+  "锻火龙姫":"21锻火龙姫.png","雷神":"14雷神.png","霜星射手":"16霜星射手.png",
+  "青铜神姬":"32青铜神姬.png","魅夜之狩":"13魅夜之狩.png","鹰之勇者":"43鹰之勇者.png",
+  "黑猫女神":"53黑猫女神.png",
+};
+const DEFAULT_TIERS = [
+  { label:"T0", color:"#FF4444" },
+  { label:"T0.5", color:"#FF8844" },
+  { label:"T1", color:"#FFCC44" },
+  { label:"T2", color:"#88CC44" },
+  { label:"T3", color:"#4488FF" }
+];
+const STORAGE_KEY = "tier_list_editor";
+
+// State
+let state = { tiers:[], filter:"全部" };
+let baowuMap = {};  // name -> true/false
+let dragData = null;
+let ctxChar = null, ctxTier = null;
+
+// DOM refs
+const $ = id => document.getElementById(id);
+const tierContainer = $('tierContainer');
+const poolGrid = $('poolGrid');
+const filtersEl = $('filters');
+const statusbar = $('statusbar');
+const charCount = $('charCount');
+const ctxMenu = $('ctxMenu');
+
+// ===== Image element cache =====
+// All img elements ever created, keyed by character name
+const imgCache = {};
+
+function createCharImg(name) {
+  const factions = CHAR_FACTIONS[name];
+  const primaryFaction = factions[0];
+  const img = document.createElement('img');
+  img.className = 'char-img';
+  img.dataset.faction = primaryFaction;
+  img.dataset.name = name;
+  img.draggable = true;
+  img.title = name;
+
+  img.src = '阵容/' + (CHAR_FILES[name] || name + '.png');
+  img.onerror = function() { this.style.display = 'none'; };
+
+  img.addEventListener('dragstart', function(e) {
+    const src = this.parentElement === poolGrid ? null : findTierIdx(this);
+    dragData = { name, fromTier: src };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', name);
+    setTimeout(() => this.classList.add('dragging'), 0);
+  });
+  img.addEventListener('dragend', function(e) {
+    this.classList.remove('dragging');
+    dragData = null;
+    document.querySelectorAll('.tier-body,.tier-row').forEach(el => el.classList.remove('drag-over'));
+  });
+  img.addEventListener('contextmenu', function(e) {
+    if (this.parentElement === poolGrid) return;
+    e.preventDefault(); e.stopPropagation();
+    ctxChar = name;
+    ctxTier = findTierIdx(this);
+    showCtxMenu(e.clientX, e.clientY);
+  });
+
+  imgCache[name] = img;
+  return img;
+}
+
+function findTierIdx(img) {
+  const body = img.closest('.tier-body');
+  if (!body) return null;
+  return parseInt(body.dataset.tierIdx);
+}
+
+// ===== Initial image creation =====
+function initImages() {
+  for (const name of Object.keys(CHAR_FACTIONS)) {
+    createCharImg(name);
+  }
+}
+
+// ===== Render tiers structure =====
+function buildTierStructure() {
+  tierContainer.innerHTML = '';
+  state.tiers.forEach((tier, idx) => {
+    const row = document.createElement('div');
+    row.className = 'tier-row';
+    row.dataset.tierIdx = idx;
+
+    const labelArea = document.createElement('div');
+    labelArea.className = 'tier-label-area';
+
+    const bar = document.createElement('div');
+    bar.className = 'tier-color-bar';
+    bar.style.background = tier.color;
+    bar.title = '点击修改颜色';
+    bar.addEventListener('click', e => { e.stopPropagation(); changeTierColor(idx); });
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'tier-name';
+    nameEl.textContent = tier.label;
+    nameEl.title = '点击重命名';
+    nameEl.addEventListener('click', e => { e.stopPropagation(); renameTier(idx); });
+
+    const cnt = document.createElement('span');
+    cnt.className = 'tier-count';
+    cnt.textContent = tier.chars.length + ' 个';
+
+    labelArea.appendChild(bar);
+    labelArea.appendChild(nameEl);
+    labelArea.appendChild(cnt);
+
+    const body = document.createElement('div');
+    body.className = 'tier-body' + (tier.chars.length === 0 ? ' empty' : '');
+    body.dataset.tierIdx = idx;
+
+    body.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; body.classList.add('drag-over'); });
+    body.addEventListener('dragleave', e => { body.classList.remove('drag-over'); });
+    body.addEventListener('drop', e => {
+      e.preventDefault();
+      body.classList.remove('drag-over');
+      document.querySelectorAll('.tier-body').forEach(el => el.classList.remove('drag-over'));
+      handleDrop(idx, e.clientX);
+    });
+
+    const actions = document.createElement('div');
+    actions.className = 'tier-actions';
+
+    const renameBtn = document.createElement('span');
+    renameBtn.className = 'tier-action-btn';
+    renameBtn.textContent = '✎';
+    renameBtn.title = '重命名';
+    renameBtn.addEventListener('click', e => { e.stopPropagation(); renameTier(idx); });
+
+    const delBtn = document.createElement('span');
+    delBtn.className = 'tier-action-btn del';
+    delBtn.textContent = '✕';
+    delBtn.title = '删除阶级';
+    delBtn.addEventListener('click', e => { e.stopPropagation(); deleteTier(idx); });
+
+    actions.appendChild(renameBtn);
+    actions.appendChild(delBtn);
+
+    row.appendChild(labelArea);
+    row.appendChild(body);
+    row.appendChild(actions);
+    tierContainer.appendChild(row);
+  });
+
+  // Now populate tier bodies with cached images
+  populateTiers();
+}
+
+function createTierCharDisplay(name, tierIdx) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;align-items:center;gap:4px;position:relative;z-index:0;';
+
+  const img = imgCache[name];
+  if (img) {
+    img.className = 'char-img in-tier';
+    img.dataset.tierIdx = tierIdx;
+    wrap.appendChild(img);
+  }
+
+  // Baowu icon (if applicable)
+  if (baowuMap[name]) {
+    const bw = document.createElement('img');
+    bw.className = 'baowu-icon';
+    bw.src = '宝具.png';
+    bw.style.cssText = 'height:55px;width:auto;flex-shrink:0;margin-left:-40px;position:relative;z-index:1;';
+    bw.onerror = function() { this.style.display = 'none'; };
+    wrap.appendChild(bw);
+  }
+
+  return wrap;
+}
+
+function populateTiers() {
+  state.tiers.forEach((tier, idx) => {
+    const body = getTierBody(idx);
+    if (!body) return;
+    body.querySelectorAll('.tier-char-wrap').forEach(el => el.remove());
+    tier.chars.forEach(name => {
+      if (imgCache[name]) {
+        const wrap = createTierCharDisplay(name, idx);
+        wrap.className = 'tier-char-wrap';
+        body.appendChild(wrap);
+      }
+    });
+    updateTierEmptyState(idx);
+  });
+}
+
+function getTierBody(idx) {
+  return tierContainer.querySelector('.tier-row[data-tier-idx="' + idx + '"] .tier-body');
+}
+
+function updateTierEmptyState(idx) {
+  const body = getTierBody(idx);
+  if (!body) return;
+  const has = body.querySelectorAll('.char-img').length > 0;
+  body.classList.toggle('empty', !has);
+  const cnt = body.closest('.tier-row').querySelector('.tier-count');
+  if (cnt) cnt.textContent = state.tiers[idx].chars.length + ' 个';
+}
+
+// ===== Pool =====
+function updatePool() {
+  const placed = new Set();
+  state.tiers.forEach(t => t.chars.forEach(c => placed.add(c)));
+
+  for (const name of Object.keys(CHAR_FACTIONS)) {
+    const img = imgCache[name];
+    if (!img) continue;
+    if (placed.has(name)) {
+      if (img.parentElement === poolGrid) img.remove();
+    } else {
+      const show = state.filter === '全部' || CHAR_FACTIONS[name].includes(state.filter);
+      img.className = 'char-img in-pool' + (show ? '' : ' hidden');
+      if (img.parentElement !== poolGrid) {
+        poolGrid.appendChild(img);
+      }
+    }
+  }
+}
+
+// ===== Filters =====
+function updateFilters() {
+  filtersEl.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.className = 'faction-btn' + (state.filter === '全部' ? ' active' : '');
+  allBtn.textContent = '全部 (' + Object.keys(CHAR_FACTIONS).length + ')';
+  allBtn.addEventListener('click', function() { state.filter = '全部'; save(); updatePool(); updateFilters(); });
+  filtersEl.appendChild(allBtn);
+
+  FACTIONS.forEach(f => {
+    const cnt = Object.keys(CHAR_FACTIONS).filter(n => CHAR_FACTIONS[n].includes(f)).length;
+    const btn = document.createElement('button');
+    btn.className = 'faction-btn' + (state.filter === f ? ' active' : '');
+    btn.textContent = f + ' (' + cnt + ')';
+    btn.style.borderColor = state.filter === f ? FACTION_COLORS[f] : undefined;
+    btn.addEventListener('click', function() { state.filter = f; save(); updatePool(); updateFilters(); });
+    filtersEl.appendChild(btn);
+  });
+}
+
+function updateCharCount() {
+  let total = 0;
+  state.tiers.forEach(t => total += t.chars.length);
+  charCount.textContent = '已分配 ' + total + ' / ' + Object.keys(CHAR_FACTIONS).length + ' 个角色';
+}
+
+// ===== Drop Logic =====
+function handleDrop(tierIdx, dropX) {
+  if (!dragData || !dragData.name) return;
+  const name = dragData.name;
+  const fromTier = dragData.fromTier;
+  const targetChars = state.tiers[tierIdx].chars;
+
+  if (fromTier === tierIdx) {
+    // Same tier: reorder
+    const oldIdx = targetChars.indexOf(name);
+    if (oldIdx === -1) { dragData = null; return; }
+    targetChars.splice(oldIdx, 1);
+    // Find new insertion position based on mouse X
+    const body = getTierBody(tierIdx);
+    let insertAt = targetChars.length;
+    if (body && dropX) {
+      const wraps = body.querySelectorAll('.tier-char-wrap');
+      for (let i = 0; i < wraps.length; i++) {
+        const rect = wraps[i].getBoundingClientRect();
+        if (dropX < rect.left + rect.width / 2) {
+          insertAt = i;
+          break;
+        }
+      }
+    }
+    targetChars.splice(insertAt, 0, name);
+    dragData = null;
+    save();
+    refreshTierDisplay(tierIdx);
+    updateCharCount();
+    return;
+  }
+
+  if (targetChars.includes(name)) { dragData = null; return; }
+
+  if (fromTier !== null) {
+    const src = state.tiers[fromTier].chars;
+    const i = src.indexOf(name);
+    if (i !== -1) src.splice(i, 1);
+  }
+
+  targetChars.push(name);
+  dragData = null;
+  save();
+
+  const img = imgCache[name];
+  if (img && img.parentElement === poolGrid) img.remove();
+
+  refreshTierDisplay(tierIdx);
+  if (fromTier !== null) refreshTierDisplay(fromTier);
+
+  updatePool();
+  updateCharCount();
+}
+
+function refreshTierDisplay(idx) {
+  const body = getTierBody(idx);
+  if (!body) return;
+  body.querySelectorAll('.tier-char-wrap').forEach(el => el.remove());
+  state.tiers[idx].chars.forEach(name => {
+    if (imgCache[name]) {
+      const wrap = createTierCharDisplay(name, idx);
+      wrap.className = 'tier-char-wrap';
+      body.appendChild(wrap);
+    }
+  });
+  updateTierEmptyState(idx);
+}
+
+// ===== Context Menu =====
+function showCtxMenu(x, y) {
+  ctxMenu.style.left = x + 'px';
+  ctxMenu.style.top = y + 'px';
+  ctxMenu.classList.add('show');
+}
+
+document.addEventListener('click', function(e) {
+  if (!ctxMenu.contains(e.target)) ctxMenu.classList.remove('show');
+});
+
+ctxMenu.addEventListener('click', function(e) {
+  const action = e.target.dataset.action;
+  if (!action) return;
+  ctxMenu.classList.remove('show');
+  if (ctxChar === null || ctxTier === null) return;
+  if (action === 'baowu') {
+    baowuMap[ctxChar] = !baowuMap[ctxChar];
+    save();
+    refreshTierDisplay(ctxTier);
+    setStatus(baowuMap[ctxChar] ? '已添加宝具' : '已移除宝具');
+  } else if (action === 'remove') {
+    const idx = state.tiers[ctxTier].chars.indexOf(ctxChar);
+    if (idx !== -1) {
+      state.tiers[ctxTier].chars.splice(idx, 1);
+      save();
+      const img = imgCache[ctxChar];
+      if (img && img.parentElement !== poolGrid) img.remove();
+      refreshTierDisplay(ctxTier);
+      updatePool();
+      updateCharCount();
+      setStatus('已移除 ' + ctxChar);
+    }
+  }
+  ctxChar = null;
+  ctxTier = null;
+});
+
+// ===== Tier Operations =====
+function renameTier(idx) {
+  const tier = state.tiers[idx];
+  const name = prompt('输入新的阶级名称：', tier.label);
+  if (name && name.trim()) {
+    tier.label = name.trim();
+    save();
+    // Update just the label text in DOM
+    const row = tierContainer.querySelector('.tier-row[data-tier-idx="' + idx + '"]');
+    if (row) row.querySelector('.tier-name').textContent = tier.label;
+    setStatus('已重命名');
+  }
+}
+
+function changeTierColor(idx) {
+  const tier = state.tiers[idx];
+  const input = document.createElement('input');
+  input.type = 'color';
+  input.value = tier.color;
+  input.addEventListener('input', function() {
+    tier.color = this.value;
+    save();
+    const row = tierContainer.querySelector('.tier-row[data-tier-idx="' + idx + '"]');
+    if (row) row.querySelector('.tier-color-bar').style.background = tier.color;
+  });
+  input.addEventListener('change', function() { input.remove(); });
+  input.click();
+  document.body.appendChild(input);
+  setTimeout(() => { if (input.parentNode) input.remove(); }, 60000);
+}
+
+function deleteTier(idx) {
+  if (state.tiers.length <= 1) { setStatus('至少保留一个阶级'); return; }
+  const tier = state.tiers[idx];
+  if (!confirm('确定删除 "' + tier.label + '" 吗？' + tier.chars.length + ' 个角色将回到角色池。')) return;
+  // Move chars back to pool in state
+  tier.chars = [];
+  state.tiers.splice(idx, 1);
+  save();
+  buildTierStructure();
+  updatePool();
+  updateCharCount();
+  setStatus('已删除 ' + tier.label);
+}
+
+function addTier() {
+  const colors = ['#FF4444','#FF8844','#FFCC44','#88CC44','#4488FF','#AA66FF','#FF66AA','#66DDAA','#66AAFF','#FFAA66'];
+  const color = colors[(state.tiers.length) % colors.length];
+  const label = 'T' + (state.tiers.length + 1);
+  state.tiers.push({ label, color, chars: [] });
+  save();
+  buildTierStructure();
+  updateCharCount();
+  setStatus('已添加 ' + label);
+  const scroll = $('tierScroll');
+  setTimeout(() => { scroll.scrollTop = scroll.scrollHeight; }, 50);
+}
+
+function resetAll() {
+  if (!confirm('确定重置所有数据吗？')) return;
+  state.tiers = DEFAULT_TIERS.map(t => ({ label: t.label, color: t.color, chars: [] }));
+  state.filter = '全部';
+  baowuMap = {};
+  save();
+  buildTierStructure();
+  updatePool();
+  updateFilters();
+  updateCharCount();
+  setStatus('已重置');
+}
+
+// ===== Storage =====
+function loadStorage() {
+  try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch(e) { return null; }
+}
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ tiers: state.tiers, filter: state.filter, baowu: baowuMap })); } catch(e) {}
+}
+
+// ===== Status =====
+let statusTimeout = null;
+function setStatus(msg, isSuccess) {
+  statusbar.textContent = msg;
+  statusbar.className = 'statusbar' + (isSuccess ? ' success' : '');
+  if (statusTimeout) clearTimeout(statusTimeout);
+  statusTimeout = setTimeout(() => {
+    statusbar.className = 'statusbar';
+    statusbar.textContent = '拖拽角色从右到左，在阶级间拖拽可移动，右键移除/添加宝具';
+  }, 3000);
+}
+
+// ===== Init =====
+function init() {
+  const saved = loadStorage();
+  state.tiers = (saved && saved.tiers && saved.tiers.length)
+    ? saved.tiers
+    : DEFAULT_TIERS.map(t => ({ label: t.label, color: t.color, chars: [] }));
+  state.filter = (saved && saved.filter) ? saved.filter : '全部';
+  baowuMap = (saved && saved.baowu) ? saved.baowu : {};
+
+  initImages();
+  buildTierStructure();
+  updatePool();
+  updateFilters();
+  updateCharCount();
+}
+
+// Events
+$('addTierBtn').addEventListener('click', addTier);
+$('saveBtn').addEventListener('click', function() { save(); setStatus('已保存', true); });
+$('resetBtn').addEventListener('click', resetAll);
+
+init();
+</script>
+</body>
+</html>
